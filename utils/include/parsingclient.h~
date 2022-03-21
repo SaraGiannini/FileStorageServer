@@ -1,0 +1,38 @@
+#if !defined(PARSING_CLIENT_H_)
+#define PARSING_CLIENT_H
+
+
+/**
+ *
+ * @file Header per la funzione di parsing degli argomenti da linea di comando del Client
+ *
+ */ 
+
+/**
+ * @struct di input -opt args
+ */
+typedef struct optarg{
+	char opt;
+	char* args;
+	optarg* next;
+} optarg_t;
+
+
+/**
+ * @brief funzione che ritorna la lista di opt-arg relativa ai dati di configurazione del Client, quali -p, -h, -f, -t
+ */
+optarg_t* parsingConf(int argc, char* argv[]);
+
+/**
+ * @brief funzione che ritorna la lista di opt-arg relativa ai dati delle richieste del Client,
+ * 		quali -w, -W, -a, -D, -r, -R, -d, -l, -u, -c
+ */
+optarg_t* parsingReq(int argc, char* argv[]);
+
+/**
+ * @funzione chiamata da parsingReq per controllare che -D e -d siano presenti solo se presenti -w/W e -r/R rispettivamente
+ */
+static int validateOpt(optarg_t* reqList);
+
+
+#endif

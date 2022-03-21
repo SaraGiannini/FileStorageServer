@@ -1,0 +1,19 @@
+#FILE DI CONFIGURAZIONE PER AVVIO SERVER
+
+#numero di threads Worker
+NWORKER : 8
+
+#numero massimo di file memorizzabili nello storage
+MAXFILE : 100
+
+#spazio di memorizzazione dello storage (in bytes)
+MAXCAPACITY : 32000000
+
+#nome del socket file
+SOCKETFILENAME : LSOfilestorage.sk
+
+#cartella di salvataggio dei log
+LOGFILENAME : loggingt3.log
+
+#politica di rimpiazzamento dei file nella cache del server a seguito di "capacity misses" (FIFO, LRU, LFU)
+REPLACEMENTPOLICY : FIFO

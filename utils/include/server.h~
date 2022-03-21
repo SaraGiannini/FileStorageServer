@@ -1,0 +1,136 @@
+#define _POSIX_C_SOURCE 200112L
+#if !defined(SERVER_H)
+#define SERVER_H
+
+/**
+ *
+ * @file file header per le procedure dedicate al server
+ *
+ */
+ 
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
+
+#include "util.h"
+#include "conn.h"
+
+char *strtok_r(char *str, const char *delim, char **saveptr);
+
+/**
+ *
+ * @struct pair_t
+ * @brief coppia chiave-valore
+ *
+ */
+typedef struct pair{
+	char* key;	//nome della chiave 
+	char* value;	//valore rispettivo (convertito poi in intero per i valori che lo richiedono)
+} pair_t;
+
+/**
+ *
+ * @struct info_t
+ * @brief informazioni di configurazione del server
+ *
+ */
+typedef struct info{
+	pair_t nworker;		//numero di threads Worker
+	pair_t maxfile;		//numero massimo di file memorizzabili nello storage
+	pair_t maxcap;		//spazio di memorizzazione dello storage (in bytes - 1MB)
+	pair_t sockname;	//nome del socket file
+	pair_t logpath;		//nome cartella di salvataggio dei log
+} info_t;
+
+
+/** 
+ *
+ * @brief procedura che preleva le informazioni di configurazione dal file apposito
+ * @param filename file da cui leggere le informazioni
+ * @return struttura contenente tali informazioni
+ *
+ */
+info_t* getConfigInfo(const char* filename){
+	info_t* cinfo  = (info_t*) malloc(sizeof(info_t));
+	CHECK_EQ_EXIT(cinfo, NULL, "malloc"); //RETURN NULL???
+	
+	FILE* cfile;
+	char buf[BUFSIZ];
+	pair_t* kvpair;
+	
+	if((cfile = fopen(filename, "r")) == NULL){
+		perror("fopen");
+		int err = errno;
+		fprintf(stderr, "aprendo input file %s: errno=%d\n", filename, err);
+		return NULL;
+	}
+	
+	while(fgets(buf, BUFSIZ, cfile) != NULL){
+		//salto commenti e righe vuote
+		if(buf[0] == '#' || buf[0] == '\n') continue;
+		
+		//coppia chiave-valore di salvataggio valori tokenizzati
+		kvpair = malloc(sizeof(pair_t));
+		CHECK_EQ_EXIT(kvpair, NULL, "malloc");
+		
+		//tokenizzo tramite ' : '
+		char *tmp = NULL, *token;
+		//chiave
+		token = strtok_r(buf, " : ", &tmp);
+		if(!token){
+			free(kvpair);
+			return NULL;
+		}
+		strncpy(kvpair->key, token, strlen(token));
+		kvpair->key[strlen(kvpair->key)-1] = '\0';
+		//valore
+		token = strtok_r(NULL, " : ", &tmp);
+		if(!token){
+			free(kvpair);
+			return NULL;
+		}
+		strncpy(kvpair->value, token, strlen(token));
+		kvpair->value[strcspn(kvpair->value, "\n")] = '\0';
+		
+		if(strncmp(kvpair->key, "NWORKER", strlen(kvpair->key)) == 0){
+				//CHECK_EQ_EXIT(cinfo->nworker = malloc(sizeof(pair_t)), NULL, "malloc");
+				CHECK_EQ_EXIT((cinfo->nworker).key = malloc(sizeof(char)*strlen(kvpair->key)), NULL, "malloc");
+				strncpy((cinfo->nworker).key, "NWORKER", strlen(kvpair->key));
+				CHECK_EQ_EXIT((cinfo->nworker).value = malloc(sizeof(char)*strlen(kvpair->value)), NULL, "malloc");
+				strncpy((cinfo->nworker).value, kvpair->value, strlen(kvpair->value));
+		}
+		else if(strncmp(kvpair->key, "MAXFILE", strlen(kvpair->key) == 0) {
+				//CHECK_EQ_EXIT(cinfo->maxfile = malloc(sizeof(pair_t)), NULL, "malloc");
+				CHECK_EQ_EXIT((cinfo->maxfile).key = malloc(sizeof(char)*strlen(kvpair->key)), NULL, "malloc");
+				strncpy((cinfo->maxfile).key, "MAXFILE", strlen(kvpair->key));
+				CHECK_EQ_EXIT((cinfo->maxfile).value = malloc(sizeof(char)*strlen(kvpair->value)), NULL, "malloc");
+				strncpy((cinfo->maxfile).value, kvpair->value, strlen(kvpair->value));
+		} 
+		else if(strncmp(kvpair->key, "MAXCAPACITY", strlen(kvpair->key) == 0) {
+				//CHECK_EQ_EXIT(cinfo->maxcap = malloc(sizeof(pair_t)), NULL, "malloc");
+				CHECK_EQ_EXIT((cinfo->maxcap).key = malloc(sizeof(char)*strlen(kvpair->key)), NULL, "malloc");
+				strncpy((cinfo->maxcap).key, "MAXCAPACITY", strlen(kvpair->key));
+				CHECK_EQ_EXIT((cinfo->maxcap).value = malloc(sizeof(char)*strlen(kvpair->value)), NULL, "malloc");
+				strncpy((cinfo->maxcap).value, kvpair->value, strlen(kvpair->value));
+		} 
+		else if(strncmp(kvpair->key, "SOCKETFILENAME", strlen(kvpair->key) == 0) {
+				//CHECK_EQ_EXIT(cinfo->sockname = malloc(sizeof(pair_t)), NULL, "malloc");
+				CHECK_EQ_EXIT((cinfo->sockname).key = malloc(sizeof(char)*strlen(kvpair->key)), NULL, "malloc");
+				strncpy((cinfo->sockname).key, "SOCKETFILENAME", strlen(kvpair->key));
+				CHECK_EQ_EXIT((cinfo->sockname).value = malloc(sizeof(char)*strlen(kvpair->value)), NULL, "malloc");
+				strncpy((cinfo->sockname).value, kvpair->value, strlen(kvpair->value));
+		}
+		else if(strncmp(kvpair->key, "LOGFILENAME", strlen(kvpair->key) == 0) {
+				//CHECK_EQ_EXIT(cinfo->logpath = malloc(sizeof(pair_t)), NULL, "malloc");
+				CHECK_EQ_EXIT((cinfo->logpath).key = malloc(sizeof(char)*strlen(kvpair->key)), NULL, "malloc");
+				strncpy((cinfo->logpath).key, "LOGFILENAME", strlen(kvpair->key));
+				CHECK_EQ_EXIT((cinfo->logpath).value = malloc(sizeof(char)*strlen(kvpair->value)), NULL, "malloc");
+				strncpy((cinfo->logpath).value, kvpair->value, strlen(kvpair->value));
+		}
+	}
+	free(kvpair);
+	return cinfo;
+}
+
+#endif /* SERVER_H */

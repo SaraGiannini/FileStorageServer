@@ -1,0 +1,42 @@
+#if !defined(BOUNDED_QUEUE_H)
+#define BOUNDED_QUEUE_H
+
+/**
+ *
+ * @file Header per Coda concorrente a capacità limitata
+ *
+ */
+
+#include <pthread.h>
+
+/**
+ *
+ * @struct node_t
+ * @brief nodo interno alla coda
+ *
+ */
+typedef struct node{
+	void* data;
+	struct node* next;
+} node_t;
+
+/**
+ *
+ * @struct bqueue_t
+ * @brief coda limitata, concorrente
+ *
+ */
+typedef struct bqueue_t{
+	node_t* head;		//puntatore testa della coda 
+	node_t* tail;		//puntatore al resto della coda
+	size_t maxcap;		//massima capacità della coda
+	size_t nelem;		//numero di elementi presenti nella coda
+	size_t datasize;	//dimensione dati nella coda
+	pthread_mutex_t mtx;	//mutex per accesso in mutua esclusone alla coda
+	pthread_cond_t full;	//variabile di condizione per coda piena
+	pthread_cond_t empty;	//variabile di condizione per coda vuota	
+} bqueue_t;
+
+
+
+#endif /* BOUNDED_QUEUE_H */

@@ -93,7 +93,7 @@ int enqueue(bqueue_t* q, void* data){
 	memcpy(new->data, data, q->datasize);
 	new->next = NULL;
 	
-	LOCK(&(q->mtx), "96bq");
+	LOCK(&(q->mtx));
 	
 	while(q->nelem == q->maxcap) //coda piena -> attendere
 		WAIT(&(q->full), &(q->mtx));
@@ -121,7 +121,7 @@ int dequeue(bqueue_t* q, void* data){
 		return -1;
 	}
 	
-	LOCK(&(q->mtx), "124bq");
+	LOCK(&(q->mtx));
 	
 	while(q->nelem == 0) //coda vuota -> attendere
 		WAIT(&(q->empty), &(q->mtx));

@@ -8,7 +8,16 @@
 #include <util.h>
 #include <conn.h>
 #include <parsingclient.h>
-/** funzione che alloca una coppia opzione- argomenti  */
+
+/**
+ *
+ * @file parsingclient.c
+ * @brief File di implementazione dell'interfaccia Client per la funzionalità di parsing della linea di comando e 
+ * 		la creazione della lista di configurazione e della lista di richieste
+ *
+ */
+
+/** funzione che alloca una coppia opzione-argomenti  */
 static optarg_t* allocOptArg(char opt, char* args){
 	optarg_t* newopt = calloc(sizeof(optarg_t),1);
 	CHECK_EQ_RETURN(newopt, NULL, "calloc", NULL);
@@ -43,7 +52,7 @@ static int containsOpt(optarg_t* list, char opt){
 	return 0;
 }
 
-/** funzione per ottenere l'argomento dell'opzione opt passata come parametro s*/
+/** funzione per ottenere l'argomento dell'opzione opt passata come parametro */
 char* getArgs(optarg_t* list, char opt){
 	char* arguments = NULL;
 	optarg_t* tmp = list;

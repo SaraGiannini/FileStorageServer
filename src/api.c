@@ -18,7 +18,7 @@
 /**
  *
  * @file api.c
- * @brief File di implementazione dell'interfaccia Client per interagire con il FileStorage Servere
+ * @brief File di implementazione dell'interfaccia Client per interagire con il FileStorage Server
  *
  */
  
@@ -73,7 +73,7 @@ int createDir(const char* dirname){
 /** funzione per salvare i file nella directory
  *  sia per file espulsi da scrittura che per file letti dal FSServer */
 int saveFile(const char* dirSaving, char* path, void* content, size_t contentsize){
-	//creazione della directory di salvataggio se non esiste
+	//creazione della directory di salvataggio dei file espulsi o letti
 	if(createDir(dirSaving) != 0)
 		return -1;
 	//salvataggio della cwd
@@ -115,9 +115,9 @@ int saveFile(const char* dirSaving, char* path, void* content, size_t contentsiz
 	return 0;
 }
 
-/** funzione che riceve i files spediti dal server a seguito di lettura o espulsione,
+/** funzione che riceve i file spediti dal server a seguito di lettura o espulsione,
  *  in base all'indicazione della directory di salvataggio chiama la saveFile che effettuerà il salvataggio nella directory 
- *  altrimenti non ne farà nulla
+ *  altrimenti non farà nulla
  */
 static int receiveFiles(int fd, const char* dirname, int nFiles){
 	ssize_t n;
@@ -174,6 +174,7 @@ int openconnectionAPI(const char *sockname, int msec, const struct timespec abst
 	errno = ETIME;
 	return -1;
 }
+
 int closeconnectionAPI(const char *sockname){
 	if(!sockname){
 		errno = EINVAL;

@@ -57,10 +57,9 @@
 	}
 
 
-#define LOCK(m, s)						\
+#define LOCK(m)						\
 	if(pthread_mutex_lock(m) != 0){			\
 		fprintf(stderr, "ERRORE FATALE lock\n");\
-		perror(#s);				\
 		pthread_exit((void*)EXIT_FAILURE);	\
 	}
 

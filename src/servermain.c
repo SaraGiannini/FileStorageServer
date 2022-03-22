@@ -201,18 +201,6 @@ int main(int argc, char* argv[]){
 	//ciclo sulla select finchè non viene catturato un segnale per cui si deve avviare la terminazione del server
 	while(!iscaught(sigmtx, terminationServer)){
 		//in caso di terminazione con SIGHUP si deve togliere dalla maschera listenfd (se sempre valida)
-		/*if (iscaught(sigmtx, stopRequests) && listenfd != -1) {
-			FD_CLR(listenfd, &set);
-			if (listenfd == countfd)
-				countfd = updatemax(set, countfd);
-			SC_EXIT(err, close(listenfd), "close listenfd(1)");
-			listenfd = -1;
-			if(nActiveClient <= 0){
-				//non ci sono più client connessi si può terminare il server
-				terminazione(sigmtx, &terminationServer);
-				break;
-			}
-		}*/
 		
 		//salvo il set nella variabile temporanea per la select, che darà i fd pronti per la lettura
 		rdset = set; 
@@ -302,8 +290,7 @@ int main(int argc, char* argv[]){
 	CHECK_NEQ_EXIT(pthread_join(sigHandler, NULL), 0, "pthread_join");
 	pthread_mutex_destroy(&sigmtx);
 	
-	//if(listenfd != -1) 
-		SC_EXIT(err, close(listenfd), "close listenfd(2)");		
+	SC_EXIT(err, close(listenfd), "close listenfd(2)");		
 	SC_EXIT(err, close(pipeWtoM[0]), "close pipeWtoM[0]");
 	SC_EXIT(err, close(pipeWtoM[1]), "close pipeWtoM[1]");
 	SC_EXIT(err, close(pipeSig[0]), "close pipeSig[0]");

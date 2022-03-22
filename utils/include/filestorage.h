@@ -36,7 +36,7 @@ typedef struct file{
 	char* content;
 	size_t sizefile;
 	
-	time_t referencetime;	//tempo in cui è stato usato l'ultima volta il file - per politica LRU
+	clock_t referencetime;	//tempo in cui è stato usato l'ultima volta il file - per politica LRU
 	int referencecount;	//conteggio dei riferimenti del file - per politica LFU
 
 	int nreaders; 		//numero di lettori sul file

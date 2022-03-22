@@ -12,14 +12,15 @@
 #include <util.h>
 #include <conn.h>
 #include <workerserver.h>
+#include <loggingserver.h>
 
 /**
  * @file filestorage.c
- * @brief file di implementazione dell'interfaccia per il File Storage Server 
+ * @brief File di implementazione dell'interfaccia per il File Storage Server 
  *
  */
 
-/*********** operazioni per manipolazione liste di fd_t ************/
+/*********** operazioni per manipolazione delle liste di fd_t ************/
 
 /**
  *
@@ -139,7 +140,7 @@ static void removeFileList(filestorage_t* fs, file_t* file){
 	
 }
 
-/************ operazioni per manipolazione lista di file_t ************/
+/************ operazioni per manipolazione della lista di file_t ************/
 
 /**
  *
@@ -172,7 +173,7 @@ static file_t* allocFile(const char* pathfile){
 	f->olock = -1;
 	f->fdopening = NULL;
 	f->fdwaiting = NULL;
-	f->referencetime = time(NULL); //per LRU
+	f->referencetime = clock(); //per LRU
 	f->referencecount = 0;
 	f->nreaders = 0;
 	return f;
@@ -222,7 +223,8 @@ static void deleteFile(filestorage_t* fs, file_t* file, int notify, int dealloc)
 	int err;
 		
 	//per eliminare un file accedere al file in mutua esclusione
-	LOCK(&(file->mtx),"225");
+	LOCK(&(file->mtx));
+	
 	while(file->nreaders > 0)
 		WAIT(&(file->condrw), &(file->mtx));
 	removeFileList(fs, file);
@@ -249,8 +251,12 @@ static void deleteFile(filestorage_t* fs, file_t* file, int notify, int dealloc)
 		}
 		file->fdwaiting = file->fdwaiting->next;
 		free(tmp);
-	}	
+	}
+		
+	//logLock("UnlockpreFD %p %ld\n", file->mtx, pthread_self());
 	UNLOCK(&(file->mtx));
+	//logLock("UnlockpostFD %p %ld\n", file->mtx, pthread_self());
+	
 	if(&(file->mtx)) pthread_mutex_destroy(&(file->mtx));	
 	if(&(file->condrw)) pthread_cond_destroy(&(file->condrw));
 	//si dealloca memoria del path e del contenuto del file se indicato nel flag
@@ -346,13 +352,13 @@ int deleteFStorage(filestorage_t* fs){
  * @return path del file espulso
  */
 static file_t* getFileToExpell(filestorage_t* fs, const char* pathfile){
-	time_t timemax; //tempo massimo per LRU
-	time(&timemax);
+	clock_t timemax = clock(); //tempo massimo per LRU
+	//time(&timemax);
 	int refcount = INT_MAX; //contatore riferimento massimo per LFU
 	file_t* tmp = fs->head;
 	file_t* fileToReplace = (file_t*) malloc(sizeof(file_t));
 	CHECK_EQ_RETURN(fileToReplace, NULL, "malloc", NULL);
-				
+						
 	if(fs->replacepolicy == 0){
 		//FIFO - prendo il file da rimuovere dalla testa poichè inserito per primo
 		if(strncmp(tmp->path, pathfile, strlen(pathfile)) == 0)
@@ -360,7 +366,6 @@ static file_t* getFileToExpell(filestorage_t* fs, const char* pathfile){
 		memcpy(fileToReplace, tmp, sizeof(*tmp));
 		//aggiorno il contatore delle volte in cui si fa il rimpiazzamento
 		fs->countreplace += 1;
-		//printf("%zu RIMPIAZZI\n", fs->countreplace);
 		return fileToReplace; //ritorno subito il file estratto con FIFO
 	}
 	//altrimenti itero e controllo il campo per attuare la politica richiesta	
@@ -386,7 +391,6 @@ static file_t* getFileToExpell(filestorage_t* fs, const char* pathfile){
 	}	
 	//aggiorno il contatore delle volte in cui si fa il rimpiazzamento
 	fs->countreplace += 1;
-	//printf("%zu RIMPIAZZI\n", fs->countreplace);
 	return fileToReplace;
 }
 /**
@@ -430,7 +434,8 @@ int openfileH(filestorage_t* fs, int fdreq, char* pathfile, int flags,int pipeto
 	int exist;
 	int ret = 0; //nessun file è stato eliminato
 	
-	LOCK(&(fs->mtx), "433"); //lock su intero FileStorage 
+	LOCK(&(fs->mtx)); //lock su intero FileStorage 
+	
 	//si cerca se esiste già il file
 	file_t* file = (file_t*) icl_hash_find(fs->filetable, (void*)pathfile);
 	exist = (file != NULL) ? 1 : 0;
@@ -466,10 +471,13 @@ int openfileH(filestorage_t* fs, int fdreq, char* pathfile, int flags,int pipeto
 			CHECK_EQ_EXIT(addFdList(&(file->fdopening), fdreq), -1, "addFdList in fdopening");				
 			addFile(fs, file);
 			UNLOCK(&(fs->mtx));
+	
 		}
 		else{ //apertura 
-			LOCK(&(file->mtx), "471"); //lock su file da aprire
+			LOCK(&(file->mtx)); //lock su file da aprire
+			
 			UNLOCK(&(fs->mtx)); //posso lasciare la lock sul FS una volta acquisita la lock sul file da aprire
+			
 			if(lock){
 				if(file->olock == -1) //file unlocked
 					file->olock = fdreq;
@@ -481,7 +489,7 @@ int openfileH(filestorage_t* fs, int fdreq, char* pathfile, int flags,int pipeto
 			}
 			//fdreq ha aperto il file, lo inserisco nella lista
 			CHECK_EQ_EXIT(addFdList(&(file->fdopening), fdreq), -1, "addFdList in fdopening");
-			UNLOCK(&(file->mtx));			
+			UNLOCK(&(file->mtx));		
 		}
 	}	
 	return ret;
@@ -493,7 +501,8 @@ ssize_t readfileH(filestorage_t* fs, int fdreq, char* pathfile){
 		return -1;
 	}
 	
-	LOCK(&(fs->mtx), "496"); //acqusisco la lock sul FS solo per cercare il file da leggere
+	LOCK(&(fs->mtx)); //acqusisco la lock sul FS solo per cercare il file da leggere
+	
 	file_t* file = (file_t*) icl_hash_find(fs->filetable, (void*)pathfile);
 	if(!file){
 		UNLOCK(&(fs->mtx));
@@ -501,8 +510,10 @@ ssize_t readfileH(filestorage_t* fs, int fdreq, char* pathfile){
 		return -1;		
 	}
 	
-	LOCK(&(file->mtx),"504");
+	LOCK(&(file->mtx));
+	
 	UNLOCK(&(fs->mtx)); //posso lasciare la lock sul FS una volta acquisita la lock sul file da leggere
+	
 	//controllo per l'accesso al file: deve averlo aperto e se bloccato deve essere bloccato da fdreq
 	if(!containsFdList(file->fdopening, fdreq) || (file->olock != -1 && file->olock != fdreq)){
 		UNLOCK(&(file->mtx));
@@ -522,9 +533,10 @@ ssize_t readfileH(filestorage_t* fs, int fdreq, char* pathfile){
 	SC_EXIT(n, writen(fdreq, file->content, file->sizefile), "writenS522");
 		
 	
-	LOCK(&(file->mtx), "525");
+	LOCK(&(file->mtx));
+	
 	file->nreaders--;
-	file->referencetime = time(NULL); //per LRU
+	file->referencetime = clock(); //per LRU
 	file->referencecount++; //per LFU
 	file->ocreate = -1; //ultima op READFILE
 	if(file->nreaders == 0)
@@ -544,7 +556,7 @@ ssize_t readnfilesH(filestorage_t* fs, int fdreq, int n, int *nFilesR){
 	//si leggono al massimo 'n' file (se fs->nflie < 'n') oppure tutti i file se n == 0
 	int fileToRead = (n == 0 || n > fs->nfile) ? fs->nfile : n;	
 	
-	LOCK(&(fs->mtx), "547"); //non ci sarà scrittura o cancellazione in contemporanea perchè si detiene il lock sull'intero FS
+	LOCK(&(fs->mtx)); //non ci sarà scrittura o cancellazione in contemporanea perchè si detiene il lock sull'intero FS
 	ssize_t nw;
 	sreturnfile_t retfile;
 	memset(&retfile, 0, sizeof(sreturnfile_t));
@@ -567,7 +579,7 @@ ssize_t readnfilesH(filestorage_t* fs, int fdreq, int n, int *nFilesR){
 			//si invia al client il file letto
 			SC_EXIT(nw, writen(fdreq, reading->content, reading->sizefile), "writenS568");
 			byteRead += reading->sizefile;
-			reading->referencetime = time(NULL); //per LRU
+			reading->referencetime = clock(); //per LRU
 			reading->referencecount++; //per LFU
 			reading->nreaders--;
 			fileRead++;
@@ -588,7 +600,8 @@ int writefileH(filestorage_t* fs, int fdreq, char* pathfile, const char* content
 	}
 	int nExpell = 0;
 	
-	LOCK(&(fs->mtx),"591"); //lock su intero FileStorage  per evitare cancellazione ed altre scritture
+	LOCK(&(fs->mtx)); //lock su intero FileStorage  per evitare cancellazione ed altre scritture
+	
 	file_t* file = (file_t*) icl_hash_find(fs->filetable, (void*)pathfile);
 	if(!file){
 		UNLOCK(&(fs->mtx));
@@ -596,7 +609,8 @@ int writefileH(filestorage_t* fs, int fdreq, char* pathfile, const char* content
 		return -1;
 	}
 	
-	LOCK(&(file->mtx), "599");
+	LOCK(&(file->mtx));
+	
 	//la prima scrittura può avvenire solo se l'ultima operazione è la OPENFILE, garantita se il creatore è fdreq e ne detiene la lock
 	if(file->ocreate == fdreq && file->olock == fdreq){
 		if(size > fs->atmostsize){
@@ -615,7 +629,7 @@ int writefileH(filestorage_t* fs, int fdreq, char* pathfile, const char* content
 		CHECK_EQ_EXIT(file->content = calloc(sizeof(char)*size+1, 1), NULL, "calloc");
 		memcpy(file->content, content, size);
 		file->sizefile = size;
-		file->referencetime = time(NULL); //per LRU
+		file->referencetime = clock(); //per LRU
 		file->referencecount++; //per LFU
 		file->ocreate = -1; //ultima op WRITEFILE
 		fs->size += size;
@@ -641,7 +655,7 @@ int appendtofileH(filestorage_t* fs, int fdreq, char* pathfile, const char* cont
 	}
 	int nExpell = 0;
 	
-	LOCK(&(fs->mtx), "644"); //lock su intero FileStorage  per evitare cancellazione ed altre scritture
+	LOCK(&(fs->mtx)); //lock su intero FileStorage  per evitare cancellazione ed altre scritture
 	file_t* file = (file_t*) icl_hash_find(fs->filetable, (void*)pathfile);
 	if(!file){
 		UNLOCK(&(fs->mtx));
@@ -649,7 +663,7 @@ int appendtofileH(filestorage_t* fs, int fdreq, char* pathfile, const char* cont
 		return -1;
 	}	
 	
-	LOCK(&(file->mtx), "652");
+	LOCK(&(file->mtx));
 	//controllo per l'accesso al file : deve averlo aperto e se bloccato deve averlo bloccato fdreq 
 	if(!containsFdList(file->fdopening, fdreq) || (file->olock != -1 && file->olock != fdreq)){
 		UNLOCK(&(file->mtx));
@@ -679,7 +693,7 @@ int appendtofileH(filestorage_t* fs, int fdreq, char* pathfile, const char* cont
 	memcpy(file->content, buffer, strlen(buffer));
 	file->sizefile = strlen(buffer);
 	free(buffer);
-	file->referencetime = time(NULL); //per LRU
+	file->referencetime = clock(); //per LRU
 	file->referencecount++; //per LFU
 	file->ocreate = -1; //ultima op APPENDFILE
 	//dimensione FS aggiornata
@@ -698,14 +712,14 @@ int lockfileH(filestorage_t* fs, int fdreq, char* pathfile){
 		return -1;
 	}
 	
-	LOCK(&(fs->mtx), "701"); 
+	LOCK(&(fs->mtx)); 
 	file_t* file = (file_t*) icl_hash_find(fs->filetable, (void*)pathfile);
 	if(!file){
 		UNLOCK(&(fs->mtx));
 		errno = (!fs->filetable) ? EINVAL : ENOENT;
 		return -1;
 	}	
-	LOCK(&(file->mtx), "708");
+	LOCK(&(file->mtx));
 	UNLOCK(&(fs->mtx)); //una volta acquisito il lock sul file da bloccare, posso rilasciare la lock sul fs
 	
 	//controllo se il file è messo in locked da un'altro richiedente
@@ -728,14 +742,14 @@ int unlockfileH(filestorage_t* fs, int fdreq, char* pathfile){
 		return -1;
 	}
 	int fdlock = 0;
-	LOCK(&(fs->mtx),"731"); 
+	LOCK(&(fs->mtx)); 
 	file_t* file = (file_t*) icl_hash_find(fs->filetable, (void*)pathfile);
 	if(!file){
 		UNLOCK(&(fs->mtx));
 		errno = (!fs->filetable) ? EINVAL : ENOENT;
 		return -1;
 	}
-	LOCK(&(file->mtx), "738");
+	LOCK(&(file->mtx));
 	UNLOCK(&(fs->mtx)); //una volta acquisito il lock sul file da sbloccare, posso rilasciare la lock sul FS
 	
 	//controllare se il richiedente è colui che detiene la lock
@@ -759,7 +773,9 @@ int closefileH(filestorage_t* fs, int fdreq, char* pathfile){
 		return -1;
 	}
 	int fdlock = 0;
-	LOCK(&(fs->mtx), "762");
+	
+	LOCK(&(fs->mtx));
+	
 	errno = 0;	
 	file_t* file = (file_t*) icl_hash_find(fs->filetable, (void*)pathfile);
 	if(!file){
@@ -767,12 +783,12 @@ int closefileH(filestorage_t* fs, int fdreq, char* pathfile){
 		errno = (!fs->filetable) ? EINVAL : ENOENT;
 		return -1;
 	}
-	LOCK(&(file->mtx),"770");
+	LOCK(&(file->mtx));
+	
 	UNLOCK(&(fs->mtx));
 	
 	if(!containsFdList(file->fdopening, fdreq) || (file->olock != -1 && file->olock != fdreq)){
 		UNLOCK(&(file->mtx));
-		UNLOCK(&(fs->mtx));
 		errno = EACCES;
 		return -1;
 	}
@@ -799,7 +815,7 @@ int removefileH(filestorage_t* fs, int fdreq, char* pathfile, int pipetoM){
 		return -1;
 	}
 	
-	LOCK(&(fs->mtx), "802"); //lock su intero FileStorage per rimuovere il file sia dalla lista che dalla icl_hash
+	LOCK(&(fs->mtx)); //lock su intero FileStorage per rimuovere il file sia dalla lista che dalla icl_hash
 	errno = 0;
 	file_t* file = (file_t*) icl_hash_find(fs->filetable, (void*)pathfile);
 	if(!file){
@@ -826,12 +842,13 @@ int closeconnectionH(filestorage_t* fs, int fdreq, int pipetoM){
 	}
 	ssize_t nw;
 	int fdlock; //fd Client in attesa della ME sul file
-	LOCK(&(fs->mtx), "829");
+	LOCK(&(fs->mtx));
+	
 	errno = 0;
 	//il client deve rilasciare la lock su tutti i file che ha bloccato
 	file_t* file = fs->head;
 	while(file){
-		LOCK(&(file->mtx), "834");
+		LOCK(&(file->mtx));
 		//rilasciare la ME sul file
 		if(file->olock == fdreq){
 			file->olock = removeFdList(&(file->fdwaiting), -1); //viene data la ME sul file a fd in testa alla lista
@@ -853,7 +870,7 @@ int closeconnectionH(filestorage_t* fs, int fdreq, int pipetoM){
 void restorefsH(filestorage_t* fs, int fdreq, char* pathfile){
 	if(!fs || fdreq <= 0 || !strlen(pathfile))
 		return;
-	LOCK(&(fs->mtx), "856");
+	LOCK(&(fs->mtx));
 	file_t* file = (file_t*) icl_hash_find(fs->filetable, (void*)pathfile);
 	if(!file){
 		UNLOCK(&(fs->mtx));

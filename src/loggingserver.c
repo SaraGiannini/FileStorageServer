@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 200112L
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -42,13 +43,35 @@ void logEvent(const char *format, ...){
 	time(&currentTime);
 	infoTime = localtime(&currentTime);
 	
-	LOCK(&logmtx, "log");
+	LOCK(&logmtx);
 	//sezione critica per il FILE logFile, funzione chiamata da diversi thread: mainThread e WorksersThread
 	if(logFile){	
 		//conversione timestamp attuale in formato leggibile
 		strftime(stringTime, MAX_TIME_LEN, "%H:%M:%S", infoTime);
 		//stampa sul file di log
 		fprintf(logFile, "--%s-- %s\n", stringTime, bufInfo);
+		fflush(logFile);
+	}
+	UNLOCK(&logmtx);
+}
+
+void logLock(const char* format, ...){
+	char bufInfo[BUFSIZ];
+	struct timespec tstart={0,0};
+    	clock_gettime(CLOCK_MONOTONIC, &tstart);
+    	
+	//definisco la stringa relativa all'operazione da registrare
+	va_list ap;
+	va_start(ap, format);
+	//scrivo sul buffer i valori passati come parametro 
+	vsnprintf(bufInfo, BUFSIZ, format, ap);
+	va_end(ap);
+	
+	LOCK(&logmtx);
+	//sezione critica per il FILE logFile, funzione chiamata da diversi thread: mainThread e WorksersThread
+	if(logFile){	
+		
+		fprintf(logFile, "[%f] %s\n", (double)tstart.tv_sec + 1.0e-9*tstart.tv_nsec, bufInfo);
 		fflush(logFile);
 	}
 	UNLOCK(&logmtx);

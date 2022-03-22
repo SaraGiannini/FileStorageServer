@@ -26,14 +26,14 @@ void *sighandlerF(void* args){
 	case SIGINT:
 	case SIGQUIT:
 		fprintf(stdout, "\n\t***** Ricevuto segnale %s *****\n", (sig == SIGINT) ? "SIGINT": "SIGQUIT");
-		LOCK(sigmtx, "sig29");
+		LOCK(sigmtx);
 		*terminationServer = 1;
 		UNLOCK(sigmtx);
 		SC_EXIT(err, close(fdmain), "close"); //notifico il main thread (in lettura) della ricezione del segnale, per sbloccare la select
 		return NULL;
 	case SIGHUP:
 		fprintf(stdout, "\n\t***** Ricevuto segnale SIGHUP *****\n");
-		LOCK(sigmtx,"sig36");
+		LOCK(sigmtx);
 		*stopRequests = 1;
 		UNLOCK(sigmtx);
 		SC_EXIT(err, close(fdmain), "close"); //notifico il main thread (in lettura) della ricezione del segnale, per sbloccare la select
@@ -44,14 +44,14 @@ void *sighandlerF(void* args){
 }
 //procedura per settare il flag di terminazione del Server in mutua esclusione 
 void terminazione(pthread_mutex_t mtx, int *termina){
-	LOCK(&mtx, "sigQuit");
+	LOCK(&mtx);
 	*termina = 1;
 	UNLOCK(&mtx);
 }
 //funzione per controllare se è stato catturato un segnale e gestito, in mutua esclusione
 int iscaught(pthread_mutex_t mtx, int flag){
 	int ret;
-	LOCK(&mtx, "sig54");
+	LOCK(&mtx);
 	ret = flag;
 	UNLOCK(&mtx);
 	return ret;

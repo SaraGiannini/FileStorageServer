@@ -226,7 +226,7 @@ void* workerF(void* args){
 					sendMsgError(fdreq);
 				}
 				else if(ret == 1) //il fd è stato inserito nella lista di fd in attesa di ottenere la ME sul file
-					continue; //(??) salto all'iterazione successiva (non si ripassa fdreq al thM)
+					continue; //salto all'iterazione successiva (non si ripassa fdreq al thM)
 				else 
 					sendMsgME(fdreq, OK, path);
 					

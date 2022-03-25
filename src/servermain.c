@@ -31,10 +31,6 @@
 static info_t* configinfo;
 static char sockname[UNIX_PATH_MAX] = "";
 
-//var.condivisa tra MainThread e WorkerThreads
-//FILE* logFile = NULL;
-//pthread_mutex_t logmtx = PTHREAD_MUTEX_INITIALIZER;
-
 void cleanup(){
 	unlink(sockname);
 	//unlink(configinfo->sockname.value);
@@ -85,7 +81,7 @@ int main(int argc, char* argv[]){
 	//thread per la gestione dei segnali
 	pthread_t sigHandler;
 	//argomenti da passare al thread che gestisce i segnali
-	sigHArgs_t sigArgs;// = {&mask, &terminationServer, &stopRequests, &sigmtx, pipeSig[1]};
+	sigHArgs_t sigArgs;
 	sigArgs.mask = &mask;
 	sigArgs.terminationServer = &terminationServer;
 	sigArgs.stopRequests = &stopRequests;
@@ -162,18 +158,14 @@ int main(int argc, char* argv[]){
 	
 	int nthwork = atoi(configinfo->nworker.value);
 	free(configinfo);
-		
-	//logEvent("[NTHREADSW] %d\n", nthwork);
-
+	
 	pthread_mutex_t workmtx;
 	CHECK_NEQ_EXIT(pthread_mutex_init(&workmtx, NULL), 0, "pthread_mutex_init");
 	pthread_cond_t workcond;
 	CHECK_NEQ_EXIT(pthread_cond_init(&workcond, NULL), 0, "pthread_cond_init");
-	//int idWorker = 0; // x statistiche
 	//argomenti da passare al thread Worker per eseguire le richieste
 	workArgs_t* workerArgs = (workArgs_t*) malloc(sizeof(workArgs_t)); 
 	CHECK_EQ_EXIT(workerArgs, NULL, "malloc");
-	//workerArgs[i].thid = i+1;
 	workerArgs->storage = fstorage;
 	workerArgs->queue = queueMtoW;
 	workerArgs->fdwrite = pipeWtoM[1];
@@ -199,9 +191,7 @@ int main(int argc, char* argv[]){
 	int nActiveClient = 0; //numero di client connessi
 		
 	//ciclo sulla select finchè non viene catturato un segnale per cui si deve avviare la terminazione del server
-	while(!iscaught(sigmtx, terminationServer)){
-		//in caso di terminazione con SIGHUP si deve togliere dalla maschera listenfd (se sempre valida)
-		
+	while(!iscaught(sigmtx, terminationServer)){	
 		//salvo il set nella variabile temporanea per la select, che darà i fd pronti per la lettura
 		rdset = set; 
 		if(select(countfd + 1, &rdset, NULL, NULL, NULL) == -1){
@@ -262,7 +252,7 @@ int main(int argc, char* argv[]){
 					countfd = (countfd < connfd) ? connfd : countfd;
 					nActiveClient++;
 					maxconn = (maxconn < nActiveClient) ? nActiveClient : maxconn;
-					logEvent("Nuova richiesta di connessione accettata: Client id:%d\n", connfd);
+					logEvent("Nuova richiesta di connessione accettata per Client id:%d\n", connfd);
 					fprintf(stdout, "\nS > Nuovo Client connesso fd:%d\n", connfd);
 				}
 				else{ //nuova richiesta da client connesso

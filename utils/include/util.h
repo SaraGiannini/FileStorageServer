@@ -105,11 +105,4 @@ static inline int isNumber(const char* s, long* n){
 	return 1;
 }
 
-static inline int getFileSize(char* file){
-	struct stat st;
-	if(stat(file, &st) == 0)
-		return st.st_size;
-	return -1;
-}
-
 #endif /* _UTIL_H */

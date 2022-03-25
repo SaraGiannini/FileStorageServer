@@ -111,7 +111,7 @@ void* workerF(void* args){
 			CHECK_EQ_EXIT(closeconnectionH(fStorageMain, fdreq, pipeWtoM), -1, "closeconnection");
 			//si chiude il fd della connessione con il Client
 			close(fdreq);
-			logEvent("Connessione con Client id:%d chiusa\n", fdreq);
+			logEvent("Connessione chiusa per Client id:%d\n", fdreq);
 			fprintf(stdout, "\nS > Connessione Chiusa CLient fd: %d\n", fdreq);
 			//ritorno al Manager fd = 0 così saprà che il Client gestito non è più connesso	
 			int fdclose = 0;
@@ -131,8 +131,6 @@ void* workerF(void* args){
 				SC_EXIT(n, readn(fdreq, content, req.contentsize), "readnS131");
 			}
 		
-			logEvent("[WORKERID] %ld", pthread_self());
-			
 			switch(req.op){
 			//ad ogni operazione si invia l'esito sul fd del Client richiedente l'operazione
 			//se l'esito è negativo si invia il messaggio di errore in base al valore di errno
@@ -284,7 +282,7 @@ void* workerF(void* args){
 				}
 			} break;
 			case RESTORE : {
-				restorefsH(fStorageMain, fdreq, path);
+				restoreFS(fStorageMain, fdreq, path);
 			} break;
 			default : {
 				logEvent("Richiesta da elaborare per Client id:%d NON GESTIBILE", fdreq);
@@ -294,8 +292,10 @@ void* workerF(void* args){
 			//tramite endpoint di scrittura della pipe
 			//ritorno al Manager il fd del Client appena gestito e nuovamente disponibile per una nuova richiesta
 			SC_EXIT(n, write(pipeWtoM, &fdreq, sizeof(fdreq)), "writeS296"); 
-			if(!errno)
+			if(!errno){
 				logEvent("Richiesta %d GESTITA\n", req.op);
+				logEvent("[WORKERID] %ld", pthread_self()); // x statistiche
+			}
 		}
 		
 		free(path);

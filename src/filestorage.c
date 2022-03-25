@@ -161,7 +161,7 @@ static file_t* allocFile(const char* pathfile){
 		free(f);
 		return NULL;
 	}
-	if(pthread_cond_init(&(f->condrw), NULL) != 0){
+	if(pthread_cond_init(&(f->cond), NULL) != 0){
 		fprintf(stderr, "pthread_cond_init\n");
 		free(f->path);
 		free(f);
@@ -181,7 +181,7 @@ static file_t* allocFile(const char* pathfile){
 static void deallocFile(file_t* file){
 	if(!file) return;
 	if(&(file->mtx)) pthread_mutex_destroy(&(file->mtx));
-	if(&(file->condrw)) pthread_cond_destroy(&(file->condrw));
+	if(&(file->cond)) pthread_cond_destroy(&(file->cond));
 	free(file->path);
 	free(file);
 }
@@ -226,7 +226,7 @@ static void deleteFile(filestorage_t* fs, file_t* file, int notify, int dealloc)
 	LOCK(&(file->mtx));
 	
 	while(file->nreaders > 0)
-		WAIT(&(file->condrw), &(file->mtx));
+		WAIT(&(file->cond), &(file->mtx));
 	removeFileList(fs, file);
 	//cancello il file pure dalla hash table
 	CHECK_EQ_EXIT(icl_hash_delete(fs->filetable, file->path, NULL, NULL), -1, "icl_hash_delete");
@@ -253,12 +253,10 @@ static void deleteFile(filestorage_t* fs, file_t* file, int notify, int dealloc)
 		free(tmp);
 	}
 		
-	//logLock("UnlockpreFD %p %ld\n", file->mtx, pthread_self());
 	UNLOCK(&(file->mtx));
-	//logLock("UnlockpostFD %p %ld\n", file->mtx, pthread_self());
 	
 	if(&(file->mtx)) pthread_mutex_destroy(&(file->mtx));	
-	if(&(file->condrw)) pthread_cond_destroy(&(file->condrw));
+	if(&(file->cond)) pthread_cond_destroy(&(file->cond));
 	//si dealloca memoria del path e del contenuto del file se indicato nel flag
 	if(dealloc && file){
 		free(file->path);
@@ -331,7 +329,6 @@ int deleteFStorage(filestorage_t* fs){
 	file_t* tmp;
 	while(fs->head){
 		tmp = fs->head;
-		//fs->head = fs->head->next;
 		deleteFile(fs, tmp, 0, 1);
 	}
 	
@@ -353,7 +350,6 @@ int deleteFStorage(filestorage_t* fs){
  */
 static file_t* getFileToExpell(filestorage_t* fs, const char* pathfile){
 	clock_t timemax = clock(); //tempo massimo per LRU
-	//time(&timemax);
 	int refcount = INT_MAX; //contatore riferimento massimo per LFU
 	file_t* tmp = fs->head;
 	file_t* fileToReplace = (file_t*) malloc(sizeof(file_t));
@@ -523,7 +519,7 @@ ssize_t readfileH(filestorage_t* fs, int fdreq, char* pathfile){
 	file->nreaders++;
 	UNLOCK(&(file->mtx)); 
 	//è possibile effettuare più letture in contemporanea
-	
+	//si invia direttamente al client il file letto
 	ssize_t n;
 	int retOK = OK;
 	SC_EXIT(n, writen(fdreq, &retOK, sizeof(int)), "writenS518");
@@ -540,7 +536,7 @@ ssize_t readfileH(filestorage_t* fs, int fdreq, char* pathfile){
 	file->referencecount++; //per LFU
 	file->ocreate = -1; //ultima op READFILE
 	if(file->nreaders == 0)
-		SIGNAL(&(file->condrw));
+		SIGNAL(&(file->cond));
 	UNLOCK(&(file->mtx));	
 	
 	return file->sizefile;
@@ -559,7 +555,6 @@ ssize_t readnfilesH(filestorage_t* fs, int fdreq, int n, int *nFilesR){
 	LOCK(&(fs->mtx)); //non ci sarà scrittura o cancellazione in contemporanea perchè si detiene il lock sull'intero FS
 	ssize_t nw;
 	sreturnfile_t retfile;
-	memset(&retfile, 0, sizeof(sreturnfile_t));
 	
 	//si invia al client il numero di file che verrano letti e spediti
 	SC_EXIT(nw, writen(fdreq, &fileToRead, sizeof(int)), "writenS553"); 
@@ -569,6 +564,7 @@ ssize_t readnfilesH(filestorage_t* fs, int fdreq, int n, int *nFilesR){
 		if(reading->olock == -1 || reading->olock == fdreq){ 
 			reading->nreaders++;		
 			
+			memset(&retfile, 0, sizeof(sreturnfile_t));
 			//lettura del file -> invio al client
 			retfile.lenpath = strlen(reading->path);
 			retfile.contentsize = reading->sizefile;
@@ -622,7 +618,7 @@ int writefileH(filestorage_t* fs, int fdreq, char* pathfile, const char* content
 		
 		//si può scrivere se non ci sono lettori attivi sul file
 		while(file->nreaders > 0)
-			WAIT(&(file->condrw), &(file->mtx));
+			WAIT(&(file->cond), &(file->mtx));
 			
 		//controllo per eventuale capacity misses
 		CHECK_EQ_EXIT(replacement(fs, fdreq, pathfile, size, &nExpell, filesExpell, pipetoM), -1, "replacement");
@@ -679,7 +675,7 @@ int appendtofileH(filestorage_t* fs, int fdreq, char* pathfile, const char* cont
 	}
 	
 	while(file->nreaders > 0)
-		WAIT(&(file->condrw), &(file->mtx));
+		WAIT(&(file->cond), &(file->mtx));
 		
 	//controllo per eventuale capacity misses
 	CHECK_EQ_EXIT(replacement(fs, fdreq, pathfile, size, &nExpell, filesExpell, pipetoM), -1, "replacement");
@@ -867,7 +863,7 @@ int closeconnectionH(filestorage_t* fs, int fdreq, int pipetoM){
 	return 0;	
 }
 
-void restorefsH(filestorage_t* fs, int fdreq, char* pathfile){
+void restoreFS(filestorage_t* fs, int fdreq, char* pathfile){
 	if(!fs || fdreq <= 0 || !strlen(pathfile))
 		return;
 	LOCK(&(fs->mtx));

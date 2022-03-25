@@ -11,8 +11,7 @@ sleep 1
 
 client=.//bin/client
 sock=LSOfilestorage.sk
-path="$( pwd -P )" #"( cd "$(dirname "$0")" ; cd .. ; pwd -P )"
-#pathfile=${path}/file
+path="$( pwd -P )" 
 
 #avvio diversi client per testare le operazioni
 echo "Avvio 3 Client"

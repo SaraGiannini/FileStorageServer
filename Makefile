@@ -57,7 +57,7 @@ test3:
 	./script/statistiche.sh loggingt3.log
 	
 clean:
-	-rm -f *~ obj/*.o lib/*.so bin/* */*~
+	-rm -f obj/*.o lib/*.so bin/* *~ */*~
 	
 cleanall:
-	-rm -f -r *~ obj/*.o lib/*.so bin/* logging*.log test/*~ espulsi* letti* test/serverout3.txt
+	-rm -f -r */*~ obj/*.o lib/*.so bin/* logging*.log test/*~ espulsi* letti* test/serverout3.txt

@@ -36,7 +36,7 @@ typedef struct file{
 	char* content;
 	size_t sizefile;
 	
-	clock_t referencetime;	//tempo in cui è stato usato l'ultima volta il file - per politica LRU
+	clock_t referencetime;	//tempo (dall'inizio del processo) in cui è stato riferito l'ultima volta il file - per politica LRU
 	int referencecount;	//conteggio dei riferimenti del file - per politica LFU
 
 	int nreaders; 		//numero di lettori sul file
@@ -44,15 +44,14 @@ typedef struct file{
 	int ocreate; 	
 	int olock;	
 	
-	//riferimenti x lista concatenata
+	//riferimenti x lista concatenata di file
 	struct file* next;
-	//struct file* prev; 
 	
 	pthread_mutex_t mtx;	//mutex per il file 
-	pthread_cond_t condrw; 	//variabile di condizione per lettura/scrittura su file (al max 1 scrittore, più lettori)
+	pthread_cond_t cond; 	//variabile di condizione per lettura/scrittura su file (al max 1 scrittore, più lettori)
 	
 	fd_t* fdopening;	//lista fd dei Client che hanno aperto tale file
-	fd_t* fdwaiting;	//lista fd dei Client che hanno richiesto la lock sul file gia 'locked' e stanno aspettando di acquisirla
+	fd_t* fdwaiting;	//lista fd dei Client che hanno richiesto la lock sul file già 'locked' e stanno aspettando di acquisirla
 } file_t;
 
  /**
@@ -233,10 +232,11 @@ int closeconnectionH(filestorage_t* fs, int fdreq, int pipetoM);
 /**
  *
  * @brief procedura che ripristina stato FS a prima dell openFile se writeFile non ha avuto successo lato server o lato client
+ 	(es. file troppo grande, file da cui prendere il contenuto non esiste)
  * @param fs: FS contenente il file
  * @param fdreq: fd del Client richiedente
  * @param pathfile: path del file la cui write non ha avuto successo ma ne è stata fatta la openfile
  *
  */
-void restorefsH(filestorage_t* fs, int fdreq, char* pathfile);
+void restoreFS(filestorage_t* fs, int fdreq, char* pathfile);
 #endif /* FILE_STORAGE_H_ */

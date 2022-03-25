@@ -22,6 +22,4 @@ FILE* logFile;
  */
 void logEvent(const char *format, ...);
 
-void logLock(const char* format, ...);
-
 #endif /* LOGGING_SERVER_H_ */

@@ -13,7 +13,7 @@ sleep 1
 
 client=./bin/client
 sock=LSOfilestorage.sk
-path="$( pwd -P )" #"( cd "$(dirname "$0")" ; cd .. ; pwd -P )"
+path="$( pwd -P )"
 
 #avvio diversi client per testare la politica FIFO
 echo "Avvio Client"

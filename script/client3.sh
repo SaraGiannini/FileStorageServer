@@ -12,11 +12,12 @@ fi
 
 client=./bin/client
 sock=LSOfilestorage.sk
-path="$( pwd -P )" #"( cd "$(dirname "$0")" ; cd .. ; pwd -P )"
+path="$( pwd -P )"
 
-#avvio diversi client
+#avvio client
 		
 while true
 do
-	${client} -f ${sock} -w file/test3/${dir} -D espulsiT3w"$dir" -r ${path}/file/test3/${dir}/file1.dat -d lettiT3r"$dir" -W file/linux.png,file/testi/prova.txt -D espulsiT3W"$dir" -c ${path}/file/linux.png -l ${path}/file/test3/${dir}/file1.dat -u ${path}/file/test3/${dir}/file1.dat 		
+	${client} -f ${sock} -w file/test3/${dir} -D espulsiT3w"$dir" -W file/linux.png,file/testi/prova.txt -D espulsiT3W"$dir" -c ${path}/file/linux.png -l ${path}/file/test3/${dir}/file1.dat -r ${path}/file/test3/${dir}/file1.dat -d lettiT3r"$dir" -u ${path}/file/test3/${dir}/file1.dat 	
+		
 done
